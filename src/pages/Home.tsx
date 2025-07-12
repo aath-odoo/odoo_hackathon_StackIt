@@ -1,9 +1,12 @@
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { LayoutGrid, List } from "lucide-react";
 import { Header } from "@/components/Header";
 import { QuestionCard } from "@/components/QuestionCard";
+import { QuestionCardCompact } from "@/components/QuestionCardCompact";
 import { FilterSidebar } from "@/components/FilterSidebar";
 
 // Mock data for demonstration
@@ -68,11 +71,62 @@ const mockQuestions = [
 const availableTags = ["SQL", "React", "JavaScript", "TypeScript", "CSS", "Python", "JOIN", "Hooks", "Interfaces", "Best-Practices", "Grid", "Flexbox", "Performance", "List-Comprehension"];
 
 export default function Home() {
-  const [questions] = useState(mockQuestions);
+  const [questions, setQuestions] = useState(mockQuestions);
   const [sortBy, setSortBy] = useState("newest");
   const [statusFilter, setStatusFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState("all-tags");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "compact">("card");
+
+  // Helper function to parse relative time strings
+  const parseTimeAgo = (timeStr: string): number => {
+    const match = timeStr.match(/(\d+)\s+(hour|day|week|month|year)s?\s+ago/);
+    if (!match) return 0;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    const multipliers = {
+      hour: 60 * 60 * 1000,
+      day: 24 * 60 * 60 * 1000,
+      week: 7 * 24 * 60 * 60 * 1000,
+      month: 30 * 24 * 60 * 60 * 1000,
+      year: 365 * 24 * 60 * 60 * 1000,
+    };
+    
+    return value * (multipliers[unit as keyof typeof multipliers] || 0);
+  };
+
+  // Load user questions from localStorage and listen for changes
+  useEffect(() => {
+    const loadQuestions = () => {
+      const userQuestions = JSON.parse(localStorage.getItem('userQuestions') || '[]');
+      setQuestions([...userQuestions, ...mockQuestions]);
+    };
+    
+    loadQuestions();
+    
+    // Listen for storage changes to update questions when deleted from other pages
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'userQuestions') {
+        loadQuestions();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events for same-window updates
+    const handleQuestionUpdate = () => {
+      loadQuestions();
+    };
+    
+    window.addEventListener('questionUpdated', handleQuestionUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('questionUpdated', handleQuestionUpdate);
+    };
+  }, []);
 
   const filteredAndSortedQuestions = useMemo(() => {
     let filtered = questions.filter(question => {
@@ -92,29 +146,99 @@ export default function Home() {
     // Sort questions
     switch (sortBy) {
       case "oldest":
-        return filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        return filtered.sort((a, b) => {
+          const dateA = new Date(a.createdAt.includes('ago') ? Date.now() - parseTimeAgo(a.createdAt) : a.createdAt);
+          const dateB = new Date(b.createdAt.includes('ago') ? Date.now() - parseTimeAgo(b.createdAt) : b.createdAt);
+          return dateA.getTime() - dateB.getTime();
+        });
       case "votes":
         return filtered.sort((a, b) => b.votes - a.votes);
       case "answers":
         return filtered.sort((a, b) => b.answers - a.answers);
       case "newest":
       default:
-        return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return filtered.sort((a, b) => {
+          const dateA = new Date(a.createdAt.includes('ago') ? Date.now() - parseTimeAgo(a.createdAt) : a.createdAt);
+          const dateB = new Date(b.createdAt.includes('ago') ? Date.now() - parseTimeAgo(b.createdAt) : b.createdAt);
+          return dateB.getTime() - dateA.getTime();
+        });
     }
   }, [questions, sortBy, statusFilter, tagFilter, searchQuery]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Header isLoggedIn={true} notificationCount={3} />
+      <Header onSearch={setSearchQuery} />
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">All Questions</h1>
+          <div className="flex items-center gap-4">
+            <ToggleGroup 
+              type="single" 
+              value={viewMode} 
+              onValueChange={(value) => value && setViewMode(value as "card" | "compact")}
+              className="border rounded-md p-1"
+            >
+              <ToggleGroupItem 
+                value="card" 
+                aria-label="Card view"
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="compact" 
+                aria-label="Compact view"
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+              >
+                <List className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+            
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="votes">Most Votes</SelectItem>
+                <SelectItem value="answers">Most Answers</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="answered">Answered</SelectItem>
+                <SelectItem value="unanswered">Unanswered</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={tagFilter} onValueChange={setTagFilter}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="All Tags" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all-tags">All Tags</SelectItem>
+                {availableTags.map(tag => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         <div className="bg-card rounded-lg border">
           {filteredAndSortedQuestions.map((question) => (
-            <QuestionCard key={question.id} question={question} />
+            viewMode === "card" ? (
+              <QuestionCard key={question.id} question={question} />
+            ) : (
+              <QuestionCardCompact key={question.id} question={question} />
+            )
           ))}
         </div>
         
@@ -122,7 +246,7 @@ export default function Home() {
           <div className="text-center py-12">
             <p className="text-muted-foreground">No questions found matching your criteria.</p>
             <Button 
-              className="mt-4 bg-orange-500 hover:bg-orange-600"
+              className="mt-4 bg-primary hover:bg-primary/90"
               onClick={() => {
                 setSearchQuery("");
                 setStatusFilter("all");
@@ -142,7 +266,7 @@ export default function Home() {
                 key={page}
                 variant={page === 1 ? "default" : "ghost"}
                 size="sm"
-                className={page === 1 ? "bg-orange-500 hover:bg-orange-600" : ""}
+                className={page === 1 ? "bg-primary hover:bg-primary/90" : ""}
               >
                 {page === 7 ? "..." : page}
               </Button>

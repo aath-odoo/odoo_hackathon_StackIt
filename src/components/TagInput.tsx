@@ -7,9 +7,10 @@ interface TagInputProps {
   tags: string[];
   onChange: (tags: string[]) => void;
   placeholder?: string;
+  maxTags?: number;
 }
 
-export function TagInput({ tags, onChange, placeholder = "Add tags..." }: TagInputProps) {
+export function TagInput({ tags, onChange, placeholder = "Add tags...", maxTags = 5 }: TagInputProps) {
   const [inputValue, setInputValue] = useState("");
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -23,7 +24,7 @@ export function TagInput({ tags, onChange, placeholder = "Add tags..." }: TagInp
 
   const addTag = () => {
     const trimmedValue = inputValue.trim();
-    if (trimmedValue && !tags.includes(trimmedValue)) {
+    if (trimmedValue && !tags.includes(trimmedValue) && tags.length < maxTags) {
       onChange([...tags, trimmedValue]);
       setInputValue("");
     }
@@ -58,7 +59,8 @@ export function TagInput({ tags, onChange, placeholder = "Add tags..." }: TagInp
         onKeyDown={handleKeyDown}
         onBlur={addTag}
         placeholder={tags.length === 0 ? placeholder : ""}
-        className="border-0 flex-1 min-w-[100px] focus-visible:ring-0 p-0 h-auto"
+        disabled={tags.length >= maxTags}
+        className="border-0 flex-1 min-w-[100px] focus-visible:ring-0 p-0 h-auto disabled:opacity-50"
       />
     </div>
   );
