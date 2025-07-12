@@ -36,6 +36,13 @@ export function Header({ notificationCount = 0, isLoggedIn = false, onSearch }: 
             <div className="flex items-center gap-4">
               {isLoggedIn ? (
                 <>
+                  <Button 
+                    onClick={() => navigate('/ask')} 
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6"
+                  >
+                    Ask Question
+                  </Button>
+                  
                   <div className="relative">
                     <Button 
                       variant="ghost" 
