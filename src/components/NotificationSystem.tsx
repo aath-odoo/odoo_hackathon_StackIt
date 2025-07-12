@@ -3,47 +3,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CheckCircle, MessageSquare, ThumbsUp, X } from "lucide-react";
-
-interface Notification {
-  id: string;
-  type: 'answer' | 'vote' | 'accept' | 'comment';
-  title: string;
-  message: string;
-  questionId?: string;
-  isRead: boolean;
-  createdAt: string;
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    type: "answer",
-    title: "New answer on your question",
-    message: "Someone answered your question about SQL joins",
-    questionId: "1",
-    isRead: false,
-    createdAt: "2 hours ago"
-  },
-  {
-    id: "2",
-    type: "vote",
-    title: "Your answer was upvoted",
-    message: "Your answer received an upvote",
-    questionId: "2",
-    isRead: false,
-    createdAt: "4 hours ago"
-  },
-  {
-    id: "3",
-    type: "accept",
-    title: "Your answer was accepted",
-    message: "The question author accepted your answer",
-    questionId: "3",
-    isRead: true,
-    createdAt: "1 day ago"
-  }
-];
+import { Bell, CheckCircle, MessageSquare, ThumbsUp, X, AtSign, HelpCircle } from "lucide-react";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 interface NotificationSystemProps {
   isOpen: boolean;
@@ -51,44 +12,26 @@ interface NotificationSystemProps {
 }
 
 export function NotificationSystem({ isOpen, onClose }: NotificationSystemProps) {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
 
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === notificationId 
-          ? { ...notification, isRead: true }
-          : notification
-      )
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, isRead: true }))
-    );
-  };
-
-  const deleteNotification = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.filter(notification => notification.id !== notificationId)
-    );
-  };
-
-  const getIcon = (type: Notification['type']) => {
+  const getIcon = (type: string) => {
     switch (type) {
       case 'answer':
+        return <HelpCircle className="h-4 w-4 text-primary" />;
+      case 'comment':
         return <MessageSquare className="h-4 w-4 text-blue-500" />;
+      case 'mention':
+        return <AtSign className="h-4 w-4 text-green-500" />;
       case 'vote':
         return <ThumbsUp className="h-4 w-4 text-green-500" />;
       case 'accept':
-        return <CheckCircle className="h-4 w-4 text-orange-500" />;
+        return <CheckCircle className="h-4 w-4 text-primary" />;
       default:
-        return <Bell className="h-4 w-4 text-gray-500" />;
+        return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  
 
   if (!isOpen) return null;
 
@@ -125,7 +68,7 @@ export function NotificationSystem({ isOpen, onClose }: NotificationSystemProps)
                 <div
                   key={notification.id}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50 ${
-                    !notification.isRead ? 'bg-orange-50 border-orange-200' : ''
+                    !notification.isRead ? 'bg-primary/5 border-primary/20' : ''
                   }`}
                   onClick={() => markAsRead(notification.id)}
                 >
@@ -134,17 +77,6 @@ export function NotificationSystem({ isOpen, onClose }: NotificationSystemProps)
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-medium text-sm">{notification.title}</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteNotification(notification.id);
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
                         {notification.message}
@@ -154,7 +86,7 @@ export function NotificationSystem({ isOpen, onClose }: NotificationSystemProps)
                       </p>
                     </div>
                     {!notification.isRead && (
-                      <div className="w-2 h-2 bg-orange-500 rounded-full mt-1"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full mt-1"></div>
                     )}
                   </div>
                 </div>

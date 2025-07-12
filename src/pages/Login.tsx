@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,27 +13,37 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate login
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const success = await login(email, password);
+      if (success) {
+        toast({
+          title: "Welcome back!",
+          description: "You have been successfully logged in.",
+        });
+        navigate("/");
+      }
+    } catch (error) {
       toast({
-        title: "Welcome back!",
-        description: "You have been successfully logged in.",
+        title: "Login failed",
+        description: "Please try again.",
+        variant: "destructive",
       });
-      navigate("/");
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="text-3xl font-bold text-primary">
+          <Link to="/" className="text-3xl font-bold text-primary hover:text-primary/80 transition-colors">
             StackIt
           </Link>
           <p className="text-muted-foreground mt-2">Sign in to your account</p>
@@ -70,7 +81,8 @@ export default function Login() {
               
               <Button 
                 type="submit" 
-                className="w-full" 
+                size="lg"
+                className="w-full text-base font-medium" 
                 disabled={isLoading}
               >
                 {isLoading ? "Signing in..." : "Sign In"}
