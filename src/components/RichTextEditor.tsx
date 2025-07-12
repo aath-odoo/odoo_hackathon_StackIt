@@ -57,12 +57,31 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
       case 'image':
         formatCode = `![${selectedText || 'Alt text'}](Image URL)`;
         break;
+      case 'align-left':
+        formatCode = `<div align="left">${selectedText || 'Text'}</div>`;
+        break;
+      case 'align-center':
+        formatCode = `<div align="center">${selectedText || 'Text'}</div>`;
+        break;
+      case 'align-right':
+        formatCode = `<div align="right">${selectedText || 'Text'}</div>`;
+        break;
+      case 'emoji':
+        formatCode = '😊';
+        break;
       default:
         formatCode = selectedText;
     }
 
     newText = value.substring(0, start) + formatCode + value.substring(end);
     onChange(newText);
+    
+    // Focus back to textarea after formatting
+    setTimeout(() => {
+      textarea.focus();
+      const newPosition = start + formatCode.length;
+      textarea.setSelectionRange(newPosition, newPosition);
+    }, 0);
   };
 
   return (
@@ -145,6 +164,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => formatText('align-left')}
             className="h-8 w-8 p-0"
           >
             <AlignLeft className="h-4 w-4" />
@@ -153,6 +173,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => formatText('align-center')}
             className="h-8 w-8 p-0"
           >
             <AlignCenter className="h-4 w-4" />
@@ -161,6 +182,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => formatText('align-right')}
             className="h-8 w-8 p-0"
           >
             <AlignRight className="h-4 w-4" />
@@ -172,7 +194,9 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => formatText('emoji')}
             className="h-8 w-8 p-0"
+            title="Insert emoji"
           >
             <Smile className="h-4 w-4" />
           </Button>

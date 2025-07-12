@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import { ChevronUp, ChevronDown, CheckCircle, MessageSquare, Clock, User } from "lucide-react";
+import { ChevronUp, ChevronDown, CheckCircle, MessageSquare, Clock, User, Trash2, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Answer {
   id: string;
@@ -99,11 +101,108 @@ export default function QuestionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [question, setQuestion] = useState<Question>(mockQuestion);
-  const [answers, setAnswers] = useState<Answer[]>(mockAnswers);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [answers, setAnswers] = useState<Answer[]>([]);
   const [newAnswer, setNewAnswer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoggedIn] = useState(true); // Mock authentication state
+  const { user, isLoggedIn, hasPermission } = useAuth();
+  
+  // Load question data from localStorage as well
+
+  // Load question data based on ID
+  useEffect(() => {
+    // Load user questions from localStorage
+    const userQuestions = JSON.parse(localStorage.getItem('userQuestions') || '[]');
+    
+    // Mock data lookup - in real app this would be an API call
+    const mockQuestions = {
+      "1": {
+        id: "1",
+        title: "How to join 2 columns in a data set to make a separate column in SQL",
+        description: `I do not know the code for it as I am a beginner. As an example what I need to do is like there is a column 1 containing First Name, and column 2 consists of last name I want a column to combine both first name and last name.
+
+For example:
+- Column 1: John
+- Column 2: Doe
+- Result Column: John Doe
+
+I've tried using CONCAT but I'm getting syntax errors. Can someone help me with the correct SQL syntax?`,
+        tags: ["SQL", "JOIN", "CONCAT"],
+        author: "User Name",
+        votes: 8,
+        answers: 3,
+        isAnswered: true,
+        createdAt: "2 hours ago",
+        userVote: null
+      },
+      "2": {
+        id: "2",
+        title: "React useState not updating state immediately",
+        description: "I'm having trouble with useState not updating the state immediately when I call the setter function. The component doesn't re-render with the new value...",
+        tags: ["React", "JavaScript", "Hooks"],
+        author: "Developer123",
+        votes: 15,
+        answers: 4,
+        isAnswered: true,
+        createdAt: "4 hours ago",
+        userVote: null
+      },
+      "3": {
+        id: "3",
+        title: "Best practices for TypeScript interface design",
+        description: "What are the best practices when designing interfaces in TypeScript? Should I use interfaces or types? When should I extend vs when should I use union types?",
+        tags: ["TypeScript", "Interfaces", "Best-Practices"],
+        author: "TSLearner",
+        votes: 23,
+        answers: 6,
+        isAnswered: true,
+        createdAt: "1 day ago",
+        userVote: null
+      },
+      "4": {
+        id: "4",
+        title: "CSS Grid vs Flexbox: When to use which?",
+        description: "I'm confused about when to use CSS Grid and when to use Flexbox. Can someone explain the main differences and use cases for each?",
+        tags: ["CSS", "Grid", "Flexbox"],
+        author: "CSSNewbie",
+        votes: 12,
+        answers: 0,
+        isAnswered: false,
+        createdAt: "2 days ago",
+        userVote: null
+      },
+      "5": {
+        id: "5",
+        title: "Python list comprehension vs for loop performance",
+        description: "I've heard that list comprehensions are faster than for loops in Python. Is this always true? When should I use each approach?",
+        tags: ["Python", "Performance", "List-Comprehension"],
+        author: "PythonDev",
+        votes: 18,
+        answers: 3,
+        isAnswered: true,
+        createdAt: "3 days ago",
+        userVote: null
+      }
+    };
+
+    // Check user questions first
+    const userQuestion = userQuestions.find((q: any) => q.id === id);
+    if (userQuestion) {
+      setQuestion(userQuestion);
+      // Load answers for this question from localStorage
+      const storedAnswers = JSON.parse(localStorage.getItem(`answers_${id}`) || '[]');
+      setAnswers(storedAnswers);
+    } else {
+      const foundQuestion = mockQuestions[id as keyof typeof mockQuestions];
+      if (foundQuestion) {
+        setQuestion(foundQuestion);
+        setAnswers(id === "1" ? mockAnswers : []); // Only question 1 has answers for now
+      } else {
+        // Question not found, redirect to 404 or home
+        navigate("/");
+      }
+    }
+  }, [id, navigate]);
 
   const handleVote = (type: 'up' | 'down', targetType: 'question' | 'answer', targetId?: string) => {
     if (!isLoggedIn) {
@@ -164,7 +263,7 @@ export default function QuestionDetail() {
   };
 
   const handleAcceptAnswer = (answerId: string) => {
-    if (!isLoggedIn || question.author !== "User Name") {
+    if (!isLoggedIn || (question.author !== user?.username && !hasPermission('moderate'))) {
       toast({
         title: "Permission denied",
         description: "Only the question author can accept answers.",
@@ -184,6 +283,62 @@ export default function QuestionDetail() {
       title: "Answer accepted",
       description: "The answer has been marked as accepted.",
     });
+  };
+
+  const handleDeleteAnswer = (answerId: string) => {
+    if (!hasPermission('moderate')) {
+      toast({
+        title: "Permission denied",
+        description: "You don't have permission to delete answers.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (confirm("Are you sure you want to delete this answer?")) {
+      setAnswers(prev => prev.filter(answer => answer.id !== answerId));
+      setQuestion(prev => ({ ...prev, answers: prev.answers - 1 }));
+      
+      // Update localStorage
+      const currentAnswers = answers.filter(answer => answer.id !== answerId);
+      localStorage.setItem(`answers_${question.id}`, JSON.stringify(currentAnswers));
+      
+      toast({
+        title: "Answer deleted",
+        description: "The answer has been removed.",
+      });
+    }
+  };
+
+  const handleDeleteQuestion = () => {
+    if (!hasPermission('moderate')) {
+      toast({
+        title: "Permission denied",
+        description: "You don't have permission to delete questions.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (confirm("Are you sure you want to delete this question? This action cannot be undone.")) {
+      // Remove from localStorage if it's a user question
+      const userQuestions = JSON.parse(localStorage.getItem('userQuestions') || '[]');
+      const updatedQuestions = userQuestions.filter((q: any) => q.id !== question.id);
+      localStorage.setItem('userQuestions', JSON.stringify(updatedQuestions));
+      
+      // Remove answers for this question
+      localStorage.removeItem(`answers_${question.id}`);
+      
+      toast({
+        title: "Question deleted",
+        description: "The question has been removed.",
+      });
+      
+      // Dispatch custom event to update Home page
+      window.dispatchEvent(new CustomEvent('questionUpdated'));
+      
+      navigate("/");
+    }
   };
 
   const handleSubmitAnswer = async (e: React.FormEvent) => {
@@ -210,11 +365,11 @@ export default function QuestionDetail() {
     setIsSubmitting(true);
 
     // Simulate API call
-    setTimeout(() => {
+    setTimeout(async () => {
       const answer: Answer = {
         id: Date.now().toString(),
         content: newAnswer,
-        author: "Current User",
+        author: user?.username || "Current User",
         votes: 0,
         isAccepted: false,
         createdAt: "just now",
@@ -223,6 +378,17 @@ export default function QuestionDetail() {
 
       setAnswers(prev => [...prev, answer]);
       setQuestion(prev => ({ ...prev, answers: prev.answers + 1 }));
+      
+      // Save answers to localStorage
+      const currentAnswers = JSON.parse(localStorage.getItem(`answers_${question.id}`) || '[]');
+      currentAnswers.push(answer);
+      localStorage.setItem(`answers_${question.id}`, JSON.stringify(currentAnswers));
+      
+      // Record activity
+      import('@/hooks/useUserActivity').then(module => {
+        module.recordActivityStandalone('answer');
+      });
+      
       setNewAnswer("");
       setIsSubmitting(false);
 
@@ -233,9 +399,22 @@ export default function QuestionDetail() {
     }, 1000);
   };
 
+  if (!question) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-6 max-w-4xl">
+          <div className="text-center">
+            <p>Loading question...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <Header isLoggedIn={isLoggedIn} notificationCount={3} />
+      <Header />
       
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         <Button 
@@ -274,7 +453,7 @@ export default function QuestionDetail() {
                 <h1 className="text-2xl font-bold mb-4">{question.title}</h1>
                 
                 <div className="prose max-w-none mb-4">
-                  <p className="whitespace-pre-wrap">{question.description}</p>
+                  <MarkdownRenderer content={question.description} />
                 </div>
                 
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -285,22 +464,32 @@ export default function QuestionDetail() {
                   ))}
                 </div>
                 
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      asked {question.createdAt}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <User className="h-4 w-4" />
-                      <span className="text-orange-500">{question.author}</span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    <span>{question.answers} answers</span>
-                  </div>
-                </div>
+                 <div className="flex items-center justify-between text-sm text-muted-foreground">
+                   <div className="flex items-center gap-4">
+                     <span className="flex items-center gap-1">
+                       <Clock className="h-4 w-4" />
+                       asked {question.createdAt}
+                     </span>
+                     <span className="flex items-center gap-1">
+                       <User className="h-4 w-4" />
+                       <span className="text-primary">{question.author}</span>
+                     </span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <MessageSquare className="h-4 w-4" />
+                     <span>{question.answers} answers</span>
+                     {hasPermission('moderate') && (
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={handleDeleteQuestion}
+                         className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     )}
+                   </div>
+                 </div>
               </div>
             </div>
           </CardContent>
@@ -336,16 +525,27 @@ export default function QuestionDetail() {
                         <ChevronDown className="h-6 w-6" />
                       </Button>
                       
-                      {question.author === "User Name" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleAcceptAnswer(answer.id)}
-                          className={`p-2 ${answer.isAccepted ? 'text-green-500' : 'text-muted-foreground'}`}
-                        >
-                          <CheckCircle className="h-6 w-6" />
-                        </Button>
-                      )}
+                       {(question.author === user?.username || hasPermission('moderate')) && (
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => handleAcceptAnswer(answer.id)}
+                           className={`p-2 ${answer.isAccepted ? 'text-green-500' : 'text-muted-foreground'}`}
+                         >
+                           <CheckCircle className="h-6 w-6" />
+                         </Button>
+                       )}
+                       
+                       {hasPermission('moderate') && (
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => handleDeleteAnswer(answer.id)}
+                           className="p-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                       )}
                     </div>
                     
                     <div className="flex-1">
@@ -357,7 +557,7 @@ export default function QuestionDetail() {
                       )}
                       
                       <div className="prose max-w-none mb-4">
-                        <p className="whitespace-pre-wrap">{answer.content}</p>
+                        <MarkdownRenderer content={answer.content} />
                       </div>
                       
                       <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -365,10 +565,18 @@ export default function QuestionDetail() {
                           <Clock className="h-4 w-4" />
                           answered {answer.createdAt}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          <span className="text-orange-500">{answer.author}</span>
-                        </span>
+                         <div className="flex items-center gap-2">
+                           <span className="flex items-center gap-1">
+                             <User className="h-4 w-4" />
+                             <span className="text-primary">{answer.author}</span>
+                           </span>
+                           {hasPermission('moderate') && (
+                             <Badge variant="outline" className="text-xs">
+                               <Shield className="h-3 w-3 mr-1" />
+                               Admin
+                             </Badge>
+                           )}
+                         </div>
                       </div>
                     </div>
                   </div>
@@ -392,7 +600,8 @@ export default function QuestionDetail() {
                 <Button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="bg-orange-500 hover:bg-orange-600"
+                  size="lg"
+                  className="text-base font-medium"
                 >
                   {isSubmitting ? "Posting..." : "Post Your Answer"}
                 </Button>
